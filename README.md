@@ -24,7 +24,7 @@ Le code est découpé pour qu'**un fichier = un concept/une fonctionnalité Exce
 | `ExcelDnaPoc.csproj` | Projet .NET 8, référence `ExcelDna.AddIn`, génère le `.xll` |
 | `AddIn.cs` | **Cycle de vie** de l'add-in (`IExcelAddIn` : `AutoOpen`/`AutoClose`) |
 | `StartupConfig.cs` / `StartupLoader.cs` | **Démarrage configurable** : ouvre des classeurs au chargement selon `startup.json` |
-| `WorkbookEventsBinder.cs` | **Événements Excel → callbacks C#** sur les classeurs ouverts (niveau `WorkbookEvents`) |
+| `WorkbookEventsBinder.cs` / `WorksheetEventsBinder.cs` | **Événements Excel → callbacks C#** (niveaux Workbook et Worksheet) sur les classeurs ouverts |
 | `TestAddin.xlsx` | Classeur de test (`BlagueMenuExcel` / `BlagueMenuWinform` / `BlagueMenuWpf`) |
 | `RibbonController.cs` | **Ruban** — cœur : assemble le XML CustomUI, capture `IRibbonUI`, câble les délégations |
 | `RibbonController.Demonstration.cs` | *partial* — groupe « Demonstration » (commandes simples) |
@@ -114,15 +114,50 @@ configuration ([StartupConfig.cs](StartupConfig.cs) / [StartupLoader.cs](Startup
 - Classeur de test : [TestAddin.xlsx](TestAddin.xlsx) (contient `BlagueMenuExcel`, `BlagueMenuWinform`,
   `BlagueMenuWpf` pour tester les 3 menus contextuels).
 
-### Événements Excel → callbacks C# (sur les classeurs ouverts)
+### Événements Excel → callbacks C#
 
-Chaque classeur ouvert par le démarrage voit ses **événements Excel bindés sur des callbacks C#**
-([WorkbookEventsBinder.cs](WorkbookEventsBinder.cs)) : `SheetSelectionChange`, `SheetChange`,
-`Activate`, `Deactivate`, `BeforeClose`. Même technique que l'interception du clic droit (points de
-connexion COM + sink IDispatch, **sans interop Office**) mais au niveau `WorkbookEvents`
-(GUID `00024412-…`). Pour ajouter un événement : déclarer un `[DispId(...)]` de plus dans
-l'interface `IWorkbookEvents`. *(Sélectionner/éditer une cellule de `TestAddin.xlsx` est tracé dans
-le journal `%TEMP%\ExcelDnaPoc.log`.)*
+Plusieurs événements Excel sont **bindés sur des callbacks C#** (qui écrivent dans le journal
+`%TEMP%\ExcelDnaPoc.log`). Tous utilisent la **même technique** : points de connexion COM
+(`IConnectionPoint*` du BCL) + un **sink IDispatch** portant le GUID de l'interface source et les
+bons `[DispId]` — **sans aucun interop Office**.
+
+**Niveau Application** — global, abonné une fois au chargement de l'add-in
+([CellRightClickInterceptor.cs](CellRightClickInterceptor.cs), interface `AppEvents` `00024413-…`) :
+
+| Événement | DISPID | Déclenché par |
+|-----------|:------:|---------------|
+| `SheetBeforeRightClick` | 1560 | **clic droit** sur une cellule (n'importe quel classeur) — sert à l'interception du menu (Solutions 1/2) |
+
+**Niveau Workbook** — abonné **par classeur ouvert** au démarrage
+([WorkbookEventsBinder.cs](WorkbookEventsBinder.cs), interface `WorkbookEvents` `00024412-…`) :
+
+| Événement | DISPID | Déclenché par |
+|-----------|:------:|---------------|
+| `SheetSelectionChange` | 1558 | la **sélection change** dans une feuille du classeur |
+| `SheetChange` | 1564 | le **contenu d'une cellule change** (saisie utilisateur **ou** écriture par code) dans le classeur |
+| `Activate` | 304 | le **classeur passe au premier plan** |
+| `Deactivate` | 1530 | un **autre classeur devient actif** |
+| `BeforeClose` | 1546 | **juste avant la fermeture** du classeur — **annulable** (`ref bool Cancel`) |
+
+**Niveau Worksheet** — abonné **par feuille** des classeurs ouverts
+([WorksheetEventsBinder.cs](WorksheetEventsBinder.cs), interface `DocEvents` `00024411-…`) :
+
+| Événement | DISPID | Déclenché par |
+|-----------|:------:|---------------|
+| `SelectionChange` | 1543 | la **sélection change** dans **cette** feuille précise |
+| `Change` | 1545 | une **cellule de cette feuille** est modifiée |
+| `Activate` | 304 | on **bascule sur cet onglet** |
+| `Deactivate` | 1530 | on **quitte cet onglet** |
+| `BeforeDoubleClick` | 1537 | **double-clic** sur une cellule — **annulable** (`ref bool Cancel`) |
+| `Calculate` | 279 | la feuille est **recalculée** (formules réévaluées) |
+
+> **Workbook vs Worksheet** : les événements `Sheet*` (niveau Workbook) se déclenchent pour **toutes**
+> les feuilles du classeur (le paramètre `Sh` indique laquelle) ; les événements Worksheet ne se
+> déclenchent que pour **leur** feuille. Donc sélectionner une cellule loggue **deux** lignes :
+> `(ws) SelectionChange` *et* `SheetSelectionChange`.
+>
+> **Pour ajouter un événement** : déclarer un `[DispId(...)]` de plus dans l'interface concernée
+> (`IWorkbookEvents` / `IWorksheetEvents`) — les DISPID se récupèrent par réflexion de l'interop Excel.
 
 ### Pattern asynchrone (important)
 Le modèle objet Excel est **mono-thread (STA)** : interdit d'y toucher depuis le thread de

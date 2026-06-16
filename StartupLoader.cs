@@ -54,8 +54,12 @@ public static class StartupLoader
             dynamic opened = app.Workbooks.Open(full);
             Log.Info($"Startup: classeur ouvert -> {full}");
 
-            // On binde les evenements Excel de ce classeur sur des callbacks C#.
+            // On binde les evenements Excel de ce classeur sur des callbacks C#...
             WorkbookEventsBinder.Bind(opened);
+
+            // ... et les evenements de CHAQUE feuille du classeur.
+            foreach (dynamic ws in opened.Worksheets)
+                WorksheetEventsBinder.Bind(ws, name);
         }
         catch (Exception ex)
         {
