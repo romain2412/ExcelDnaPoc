@@ -53,7 +53,7 @@ public class JokeApiService
         RunningChanged?.Invoke();
     }
 
-    // S'execute en arriere-plan. Blague recuperee, PUIS attente 45s (annulable),
+    // S'execute en arriere-plan. Blague recuperee, PUIS attente 15s (annulable),
     // PUIS seulement ecriture. Tout acces a Excel passe par QueueAsMacro.
     private async Task RunAsync(dynamic target, WpfPane pane, CancellationTokenSource cts)
     {
@@ -81,11 +81,11 @@ public class JokeApiService
             return;
         }
 
-        // 2) Attente async de 45s, decoupee pour faire avancer la barre (compte a rebours).
+        // 2) Attente async de 15s, decoupee pour faire avancer la barre (compte a rebours).
         //    La blague n'est PAS encore ecrite. Le thread UI d'Excel reste libre.
         try
         {
-            const int totalMs = 45_000;
+            const int totalMs = 15_000;
             const int stepMs = 500;
             for (int elapsed = stepMs; elapsed <= totalMs; elapsed += stepMs)
             {
@@ -102,7 +102,7 @@ public class JokeApiService
         }
 
         // 3) APRES l'attente : on ecrit enfin la blague dans la cellule.
-        Finish(cts, target, pane, "Termine : blague ecrite apres 45s.", joke, 100);
+        Finish(cts, target, pane, "Termine : blague ecrite apres 15s.", joke, 100);
     }
 
     // Centralise la fin d'operation : ecriture cellule (thread principal Excel),

@@ -59,9 +59,9 @@ Le code est découpé pour qu'**un fichier = un concept/une fonctionnalité Exce
 
 **Groupe « Reseau »**
 - **Blague (async)** (`button`) — appelle l'API `https://api.chucknorris.io/jokes/random` **sans
-  bloquer Excel**, lance un **`Task.Delay` asynchrone de 45 s** avec **barre de progression**
-  (compte à rebours) dans le volet WPF, puis écrit la blague dans la **cellule active de la feuille
-  affichée au moment du clic** — **après** l'attente. Pendant ces 45 s, Excel reste **pleinement
+  bloquer Excel**, lance un **`Task.Delay` asynchrone de 15 s** avec **barre de progression**
+  (compte à rebours) dans le volet WPF, puis écrit la blague dans la **cellule à droite de la cellule
+  sélectionnée** — **après** l'attente. Pendant ces 15 s, Excel reste **pleinement
   utilisable** (saisie, navigation, etc.).
 - **Annuler** (`button`, `getEnabled`) — actif uniquement pendant une opération ; interrompt
   proprement l'attente en cours via un `CancellationToken` (la blague n'est alors pas écrite).

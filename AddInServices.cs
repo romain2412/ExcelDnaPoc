@@ -18,7 +18,10 @@ public static class ChuckTrigger
 {
     public static void Run()
     {
-        dynamic target = ((dynamic)ExcelDnaUtil.Application).ActiveCell;
+        dynamic active = ((dynamic)ExcelDnaUtil.Application).ActiveCell;
+        // Cible = cellule immediatement a DROITE de la cellule active.
+        dynamic target = active.Worksheet.Cells[(int)active.Row, (int)active.Column + 1];
+
         target.Value2 = "Chargement de la blague...";
 
         WpfPane pane = AddInServices.TaskPane.Show();
