@@ -31,13 +31,14 @@ Le code est découpé pour qu'**un fichier = un concept/une fonctionnalité Exce
 | `RibbonController.TextTools.cs` | *partial* — groupe « Outils texte » (menu déroulant `<menu>`) |
 | `RibbonController.Interactive.cs` | *partial* — groupe « Interactif » (contrôles à état) |
 | `RibbonController.TaskPane.cs` | *partial* — adaptateur ruban → `TaskPaneController` |
-| `RibbonController.AsyncApi.cs` | *partial* — adaptateur ruban → `JokeApiService` |
+| `RibbonController.AsyncApi.cs` | *partial* — adaptateur ruban → `ChuckTrigger` |
 | `RibbonController.ContextMenu.cs` | *partial* — **Solution 2** : menu contextuel CustomUI (`getVisible`) |
 | `CellRightClickInterceptor.cs` | **Solution 1** : interception `SheetBeforeRightClick` + popup |
 | `AddInServices.cs` | Services partagés (volet, service async) + déclencheur commun `ChuckTrigger` |
 | `ChuckCommands.cs` | Macro `[ExcelCommand]` appelée par le popup (Solution 1) |
 | `TaskPaneController.cs` | **Custom Task Pane** : cycle de vie du volet, hébergement WPF |
-| `JokeApiService.cs` | **Async + `QueueAsMacro` + annulation** (`CancellationToken`) |
+| `JokeJob.cs` | **Un traitement async indépendant** : `CancellationTokenSource` propre, **parallélisable** |
+| `JobRow.xaml` (+`.cs`) | Ligne d'UI d'un traitement : statut + **barre de progression** + **Annuler** |
 | `WpfPaneHost.cs` | Pont **WinForms ↔ WPF** (`ElementHost`, ComVisible) |
 | `WpfPane.xaml` / `WpfPane.xaml.cs` | **Contenu WPF** du volet (UI + interactions Excel) |
 
@@ -58,16 +59,21 @@ Le code est découpé pour qu'**un fichier = un concept/une fonctionnalité Exce
 
 **Groupe « Volet »**
 - **Volet WPF** (`toggleButton`) — affiche/masque un **Custom Task Pane** ancré à droite, dont le
-  contenu est du **WPF**. Boutons : écrire/lire la cellule active, compter la sélection ; avec journal.
+  contenu est du **WPF** : une **liste de traitements** (un par déclenchement), des boutons
+  écrire/lire la cellule active, compter la sélection, et un journal.
 
 **Groupe « Reseau »**
 - **Blague (async)** (`button`) — appelle l'API `https://api.chucknorris.io/jokes/random` **sans
-  bloquer Excel**, lance un **`Task.Delay` asynchrone de 15 s** avec **barre de progression**
-  (compte à rebours) dans le volet WPF, puis écrit la blague dans la **cellule à droite de la cellule
-  sélectionnée** — **après** l'attente. Pendant ces 15 s, Excel reste **pleinement
-  utilisable** (saisie, navigation, etc.).
-- **Annuler** (`button`, `getEnabled`) — actif uniquement pendant une opération ; interrompt
-  proprement l'attente en cours via un `CancellationToken` (la blague n'est alors pas écrite).
+  bloquer Excel**, lance un **`Task.Delay` asynchrone de 15 s** (barre de progression dans le volet),
+  puis écrit la blague dans la **cellule à droite de la cellule sélectionnée** — **après** l'attente.
+
+**Traitements parallèles + annulation individuelle**
+- Chaque déclenchement (bouton ruban, menus contextuels, double-clic) crée un **traitement
+  indépendant** (`JokeJob`, son propre `CancellationTokenSource`) avec **sa propre ligne** dans le
+  volet : statut + **barre de progression** + bouton **Annuler**. Plusieurs traitements tournent donc
+  **en parallèle** ; lancer un nouveau traitement **n'interrompt plus** les précédents.
+- Le bouton **Annuler** d'une ligne n'annule **que ce traitement-là** (`CancellationToken`) ; la ligne
+  disparaît quelques secondes après la fin (ou l'annulation).
 
 **Menu contextuel (clic droit sur une cellule)** — 3 comportements selon le contenu de la cellule :
 
@@ -164,17 +170,20 @@ Le modèle objet Excel est **mono-thread (STA)** : interdit d'y toucher depuis l
 continuation après un `await`. Deux principes :
 
 **1. Async « jusqu'en haut » + fire-and-forget à la frontière.**
-La logique est `async Task` de bout en bout (`JokeApiService.RunAsync` ← `ChuckTrigger.RunAsync`).
-Mais les **points d'entrée sont des callbacks Excel/COM** (`onAction` du ruban, `Click` des menus,
-sinks d'événements, macros) : Excel les appelle **synchroniquement** et **n'attend pas** le `Task`
-retourné. On ne peut donc **pas** propager `async Task` *dans* Excel — le passage async→sync
-(*fire-and-forget*) est **obligatoire à cette frontière**. Il est centralisé en **un seul point** :
-`ChuckTrigger.Fire()` (`void`, lance `RunAsync` et **observe les exceptions**). Tous les callbacks
-appellent `Fire()`.
+La logique est `async Task` de bout en bout (`JokeJob.RunAsync` ← `ChuckTrigger.RunAsync`).
+Le point où l'on « redescend » en synchrone dépend du **type** de point d'entrée :
+
+- **Callbacks Excel/COM** (`onAction` du ruban, sinks d'événements, macros, double-clic) : Excel les
+  appelle **synchroniquement** et **n'attend pas** le `Task` → on ne peut **pas** propager l'`async`
+  *dans* Excel. Fire-and-forget via **`ChuckTrigger.Fire()`** (`void`, lance le `Task` et **observe les
+  exceptions**).
+- **Handlers d'événements UI WinForms/WPF** (`Click` des menus contextuels custom) : eux **peuvent**
+  être **`async void`** (le seul usage légitime d'`async void`) → l'`async` remonte **jusqu'au
+  handler**, qui `await ChuckTrigger.RunSafeAsync()` directement. Pas de fire-and-forget « caché ».
 
 **2. Réécrire dans Excel uniquement sur le thread principal.**
 Après un `await` (thread de fond), **ne pas** toucher Excel directement : repasser par
-`ExcelAsyncUtil.QueueAsMacro(...)` (voir `JokeApiService.Finish`). C'est aussi ce qui rend Excel
+`ExcelAsyncUtil.QueueAsMacro(...)` (voir `JokeJob.Finish`). C'est aussi ce qui rend Excel
 réactif pendant l'attente de 15 s.
 
 ### Architecture du volet WPF

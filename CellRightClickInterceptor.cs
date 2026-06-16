@@ -118,7 +118,7 @@ public static class CellRightClickInterceptor
 
             var menu = new System.Windows.Forms.ContextMenuStrip();
             var item = menu.Items.Add("Blague (async)");
-            item.Click += (_, _) => ChuckTrigger.Fire();
+            item.Click += async (_, _) => await ChuckTrigger.RunSafeAsync();
             _winMenu = menu; // anti-GC
 
             menu.Show(System.Windows.Forms.Cursor.Position);
@@ -140,7 +140,7 @@ public static class CellRightClickInterceptor
                 Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint,
             };
             var item = new System.Windows.Controls.MenuItem { Header = "Blague (async)" };
-            item.Click += (_, _) => ChuckTrigger.Fire();
+            item.Click += async (_, _) => await ChuckTrigger.RunSafeAsync();
             menu.Items.Add(item);
             _wpfMenu = menu; // anti-GC
 

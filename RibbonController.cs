@@ -16,7 +16,7 @@ namespace ExcelDnaPoc;
 // fournit son fragment XML (const) + ses callbacks.
 //
 // Les concepts reellement autonomes sont, eux, de VRAIES classes separees vers
-// lesquelles le ruban delegue : TaskPaneController (volet WPF) et JokeApiService
+// lesquelles le ruban delegue : TaskPaneController (volet WPF) et ChuckTrigger/JokeJob
 // (appel async). Le cycle de vie est dans AddIn.cs (IExcelAddIn).
 [ComVisible(true)]
 public partial class RibbonController : ExcelRibbon
@@ -24,16 +24,14 @@ public partial class RibbonController : ExcelRibbon
     // Reference au ruban (capturee au onLoad) pour appeler Invalidate.
     private IRibbonUI? _ribbon;
 
-    // Services partages (memes instances que le menu contextuel et l'interception
-    // du clic droit) : etat et comportement communs quel que soit le declencheur.
+    // Service partage (meme instance que le menu contextuel et l'interception du clic
+    // droit) : le volet (toggleButton du ruban) reflete son etat de visibilite.
     private readonly TaskPaneController _taskPane = AddInServices.TaskPane;
-    private readonly JokeApiService _joke = AddInServices.Joke;
 
     public RibbonController()
     {
-        // Quand un concept autonome change d'etat, on rafraichit le controle concerne.
+        // Quand le volet change de visibilite, on rafraichit le toggleButton du ruban.
         _taskPane.VisibleChanged += () => _ribbon?.InvalidateControl("tbWpf");
-        _joke.RunningChanged += () => _ribbon?.InvalidateControl("btnCancel");
     }
 
     // Callback onLoad du CustomUI : on garde la reference IRibbonUI.

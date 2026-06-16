@@ -13,6 +13,29 @@ public partial class WpfPane : System.Windows.Controls.UserControl
         Log("Volet WPF charge.");
     }
 
+    // Ajoute une ligne d'UI pour un traitement et branche les callbacks <-> JobRow.
+    // Plusieurs jobs coexistent => plusieurs lignes (barres) en parallele.
+    public void AddJob(JokeJob job, string label)
+    {
+        var row = new JobRow();
+        row.SetStatus($"{label} : demarrage...");
+        row.CancelRequested += job.Cancel;
+
+        job.OnStatus = s => row.SetStatus($"{label} : {s}");
+        job.OnProgress = row.SetProgress;
+        job.OnBusy = row.SetBusy;
+        job.OnDone = () => { row.Finish(); RemoveLater(row); };
+
+        JobsPanel.Children.Add(row);
+    }
+
+    // Retire la ligne ~4s apres la fin (laisse voir l'etat final).
+    private void RemoveLater(JobRow row) => OnUi(async () =>
+    {
+        await System.Threading.Tasks.Task.Delay(4000);
+        JobsPanel.Children.Remove(row);
+    });
+
     private void BtnWrite_Click(object sender, System.Windows.RoutedEventArgs e)
     {
         try
@@ -52,21 +75,6 @@ public partial class WpfPane : System.Windows.Controls.UserControl
     {
         LogBox.Text = $"{System.DateTime.Now:HH:mm:ss}  {message}\r\n" + LogBox.Text;
     }
-
-    // ----- API publique pilotee par l'appel async du ruban -----
-    // Ces methodes peuvent etre appelees depuis un thread de fond : on marshale
-    // systematiquement vers le thread UI WPF via le Dispatcher.
-
-    public void SetStatus(string message) => OnUi(() => StatusText.Text = message);
-
-    public void SetProgress(double percent) => OnUi(() =>
-    {
-        Progress.IsIndeterminate = false;
-        Progress.Value = percent;
-    });
-
-    // Mode "occupe" sans pourcentage (ex. pendant l'appel reseau de duree inconnue).
-    public void SetBusy(bool busy) => OnUi(() => Progress.IsIndeterminate = busy);
 
     // Execute l'action sur le thread UI WPF (sans bloquer l'appelant).
     private void OnUi(System.Action action)

@@ -29,11 +29,11 @@
       </StackPanel>
     </Border>
 
-    <!-- Statut + barre de progression (pilotes par l'appel async du ruban) -->
-    <TextBlock Grid.Row="1" x:Name="StatusText" Text="Pret." TextWrapping="Wrap"
-               Margin="0,0,0,4" FontWeight="SemiBold"/>
-    <ProgressBar Grid.Row="2" x:Name="Progress" Height="18" Minimum="0" Maximum="100"
-                 Value="0" Margin="0,0,0,12"/>
+    <!-- Traitements PARALLELES : une ligne (barre + Annuler) par traitement en cours -->
+    <TextBlock Grid.Row="1" Text="Traitements (paralleles) :" Margin="0,0,0,4" FontWeight="SemiBold"/>
+    <ScrollViewer Grid.Row="2" MaxHeight="200" VerticalScrollBarVisibility="Auto" Margin="0,0,0,12">
+      <StackPanel x:Name="JobsPanel"/>
+    </ScrollViewer>
 
     <!-- Saisie -->
     <TextBlock Grid.Row="3" Text="Texte a ecrire dans la cellule active :" Margin="0,0,0,4"/>
