@@ -13,6 +13,11 @@
     <!-- Excel est en 64 bits sur cette machine : on ne g�n�re que le .xll 64 bits -->
     <ExcelAddInExplicitExports>true</ExcelAddInExplicitExports>
     <RunExcelDnaPack>true</RunExcelDnaPack>
+
+    <!-- Genere/maj automatiquement Properties\launchSettings.json (profil "Excel")
+         a chaque build : F5 dans Visual Studio lance EXCEL.EXE avec le .xll charge.
+         ExcelDna detecte le bon chemin d'Excel et la bonne version (32/64 bits). -->
+    <RunExcelDnaSetDebuggerOptions>true</RunExcelDnaSetDebuggerOptions>
   </PropertyGroup>
 
   <ItemGroup>
