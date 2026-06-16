@@ -78,7 +78,7 @@ Le code est découpé pour qu'**un fichier = un concept/une fonctionnalité Exce
 | `BlagueMenuWpf` | menu **WPF** ne contenant **que** « Blague (async) » | interception + `System.Windows.Controls.ContextMenu` (`IsOpen=true`, `Placement=MousePoint`) ([CellRightClickInterceptor.cs](CellRightClickInterceptor.cs)) |
 | autre | menu Excel habituel | — |
 
-Les trois déclenchent le **même** comportement async que le bouton du ruban (via `ChuckTrigger.Run`).
+Les trois déclenchent le **même** comportement async que le bouton du ruban (via `ChuckTrigger.Fire`).
 Chaînes déclencheuses = constantes (`CtxTrigger`, `TriggerWinforms`, `TriggerWpf`) faciles à modifier.
 
 ### Notes d'implémentation (pièges rencontrés)
@@ -148,7 +148,7 @@ bons `[DispId]` — **sans aucun interop Office**.
 | `Change` | 1545 | une **cellule de cette feuille** est modifiée |
 | `Activate` | 304 | on **bascule sur cet onglet** |
 | `Deactivate` | 1530 | on **quitte cet onglet** |
-| `BeforeDoubleClick` | 1537 | **double-clic** sur une cellule → déclenche la **Blague async** (même `ChuckTrigger.Run` que les menus / le bouton ruban) ; `Cancel=true` empêche l'entrée en édition |
+| `BeforeDoubleClick` | 1537 | **double-clic** sur une cellule → déclenche la **Blague async** (même `ChuckTrigger.Fire` que les menus / le bouton ruban) ; `Cancel=true` empêche l'entrée en édition |
 | `Calculate` | 279 | la feuille est **recalculée** (formules réévaluées) |
 
 > **Workbook vs Worksheet** : les événements `Sheet*` (niveau Workbook) se déclenchent pour **toutes**
@@ -161,13 +161,21 @@ bons `[DispId]` — **sans aucun interop Office**.
 
 ### Pattern asynchrone (important)
 Le modèle objet Excel est **mono-thread (STA)** : interdit d'y toucher depuis le thread de
-continuation après un `await`. Le pattern correct :
-1. **Au clic** (thread principal Excel) : capturer la cible (`ActiveCell`) et lancer l'appel en
-   *fire-and-forget* (`_ = FetchAndWriteJokeAsync(target)`), sans bloquer l'UI.
-2. **Après l'`await`** (thread de fond) : récupérer/parser la réponse — **ne pas** toucher Excel ici.
-3. **Réécriture** : `ExcelAsyncUtil.QueueAsMacro(() => target.Value2 = texte)` re-marshale l'écriture
-   sur le thread principal d'Excel. Voir `OnChuckNorrisClick` / `FetchAndWriteJokeAsync` dans
-   [RibbonController.cs](RibbonController.cs).
+continuation après un `await`. Deux principes :
+
+**1. Async « jusqu'en haut » + fire-and-forget à la frontière.**
+La logique est `async Task` de bout en bout (`JokeApiService.RunAsync` ← `ChuckTrigger.RunAsync`).
+Mais les **points d'entrée sont des callbacks Excel/COM** (`onAction` du ruban, `Click` des menus,
+sinks d'événements, macros) : Excel les appelle **synchroniquement** et **n'attend pas** le `Task`
+retourné. On ne peut donc **pas** propager `async Task` *dans* Excel — le passage async→sync
+(*fire-and-forget*) est **obligatoire à cette frontière**. Il est centralisé en **un seul point** :
+`ChuckTrigger.Fire()` (`void`, lance `RunAsync` et **observe les exceptions**). Tous les callbacks
+appellent `Fire()`.
+
+**2. Réécrire dans Excel uniquement sur le thread principal.**
+Après un `await` (thread de fond), **ne pas** toucher Excel directement : repasser par
+`ExcelAsyncUtil.QueueAsMacro(...)` (voir `JokeApiService.Finish`). C'est aussi ce qui rend Excel
+réactif pendant l'attente de 15 s.
 
 ### Architecture du volet WPF
 Un Custom Task Pane Office n'héberge qu'un contrôle WinForms COM-visible. On empile donc :

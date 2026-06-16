@@ -16,7 +16,8 @@ public static class AddInServices
 // Appele par : bouton ruban, entree du menu contextuel (Solution 2) et popup (Solution 1).
 public static class ChuckTrigger
 {
-    public static void Run()
+    // Logique ASYNC de bout en bout : capture la cible, ouvre le volet, AWAIT le service.
+    public static async Task RunAsync()
     {
         dynamic active = ((dynamic)ExcelDnaUtil.Application).ActiveCell;
         // Cible = cellule immediatement a DROITE de la cellule active.
@@ -25,6 +26,18 @@ public static class ChuckTrigger
         target.Value2 = "Chargement de la blague...";
 
         WpfPane pane = AddInServices.TaskPane.Show();
-        AddInServices.Joke.Start(target, pane);
+        await AddInServices.Joke.RunAsync(target, pane);
+    }
+
+    // FRONTIERE fire-and-forget UNIQUE. Les callbacks Excel (ruban, menus, double-clic,
+    // macros) sont forcement synchrones (void) et n'attendent pas le Task : on lance ici,
+    // une seule fois, et on observe les exceptions (log). C'est le seul point ou l'async
+    // "redescend" en synchrone, au plus haut niveau possible (la frontiere Excel).
+    public static void Fire() => _ = FireAndLogAsync();
+
+    private static async Task FireAndLogAsync()
+    {
+        try { await RunAsync(); }
+        catch (Exception ex) { Log.Error("ChuckTrigger.Fire", ex); }
     }
 }

@@ -9,5 +9,5 @@ public static class ChuckCommands
 {
     // Appelee par le bouton du menu popup de la Solution 1 (CommandBarButton.OnAction).
     [ExcelCommand(Name = "ShowChuckJokeFromMenu")]
-    public static void ShowChuckJokeFromMenu() => ChuckTrigger.Run();
+    public static void ShowChuckJokeFromMenu() => ChuckTrigger.Fire();
 }

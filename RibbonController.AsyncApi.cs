@@ -23,7 +23,7 @@ public partial class RibbonController
 
     // Clic ruban OU entree du menu contextuel (Solution 2) : meme comportement,
     // delegue au declencheur commun (capture cellule active, ouvre le volet, lance l'async).
-    public void OnChuckNorrisClick(IRibbonControl control) => ChuckTrigger.Run();
+    public void OnChuckNorrisClick(IRibbonControl control) => ChuckTrigger.Fire();
 
     public void OnCancelClick(IRibbonControl control) => _joke.Cancel();
 

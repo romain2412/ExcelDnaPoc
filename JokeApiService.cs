@@ -32,18 +32,6 @@ public class JokeApiService
     // Leve a chaque changement de l'etat "en cours".
     public event Action? RunningChanged;
 
-    // Demarre une operation. A appeler sur le thread principal d'Excel (clic ruban).
-    public void Start(dynamic target, WpfPane pane)
-    {
-        // Annule une eventuelle operation precedente, puis demarre la nouvelle.
-        _cts?.Cancel();
-        var cts = new CancellationTokenSource();
-        _cts = cts;
-        SetRunning(true);
-
-        _ = RunAsync(target, pane, cts); // fire-and-forget : Excel reste utilisable
-    }
-
     // Declenche l'annulation de l'operation en cours.
     public void Cancel() => _cts?.Cancel();
 
@@ -53,10 +41,18 @@ public class JokeApiService
         RunningChanged?.Invoke();
     }
 
-    // S'execute en arriere-plan. Blague recuperee, PUIS attente 15s (annulable),
-    // PUIS seulement ecriture. Tout acces a Excel passe par QueueAsMacro.
-    private async Task RunAsync(dynamic target, WpfPane pane, CancellationTokenSource cts)
+    // Operation asynchrone AWAITABLE ("async jusqu'en haut"). La gestion du token et de
+    // l'etat "en cours" se fait SYNCHRONIQUEMENT au tout debut (avant le 1er await) ->
+    // le bouton Annuler est actif immediatement. A appeler sur le thread principal
+    // d'Excel ; le fire-and-forget est fait a la frontiere (ChuckTrigger.Fire).
+    // Blague recuperee, PUIS attente 15s (annulable), PUIS ecriture (via QueueAsMacro).
+    public async Task RunAsync(dynamic target, WpfPane pane)
     {
+        // Annule une eventuelle operation precedente, puis demarre la nouvelle.
+        _cts?.Cancel();
+        var cts = new CancellationTokenSource();
+        _cts = cts;
+        SetRunning(true);
         CancellationToken ct = cts.Token;
 
         // 1) Appel reseau (duree inconnue) -> barre en mode indetermine.

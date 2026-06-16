@@ -117,7 +117,7 @@ public class WorksheetEventsSink : IWorksheetEvents
             // Le double-clic declenche le MEME comportement que les menus contextuels /
             // le bouton du ruban (appel API Chuck Norris, attente, ecriture a droite).
             Cancel = true; // empeche l'entree en edition de la cellule double-cliquee
-            ExcelAsyncUtil.QueueAsMacro(ChuckTrigger.Run); // differe (hors evenement)
+            ExcelAsyncUtil.QueueAsMacro(ChuckTrigger.Fire); // differe (hors evenement)
         }
         catch (Exception ex) { Log.Error("ws BeforeDoubleClick", ex); }
     }
