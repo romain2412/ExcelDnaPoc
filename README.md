@@ -23,6 +23,8 @@ Le code est découpé pour qu'**un fichier = un concept/une fonctionnalité Exce
 |---------|-----------------------------------|
 | `ExcelDnaPoc.csproj` | Projet .NET 8, référence `ExcelDna.AddIn`, génère le `.xll` |
 | `AddIn.cs` | **Cycle de vie** de l'add-in (`IExcelAddIn` : `AutoOpen`/`AutoClose`) |
+| `StartupConfig.cs` / `StartupLoader.cs` | **Démarrage configurable** : ouvre des classeurs au chargement selon `startup.json` |
+| `TestAddin.xlsx` | Classeur de test (`BlagueMenuExcel` / `BlagueMenuWinform` / `BlagueMenuWpf`) |
 | `RibbonController.cs` | **Ruban** — cœur : assemble le XML CustomUI, capture `IRibbonUI`, câble les délégations |
 | `RibbonController.Demonstration.cs` | *partial* — groupe « Demonstration » (commandes simples) |
 | `RibbonController.TextTools.cs` | *partial* — groupe « Outils texte » (menu déroulant `<menu>`) |
@@ -91,6 +93,26 @@ Chaînes déclencheuses = constantes (`CtxTrigger`, `TriggerWinforms`, `TriggerW
   `E_FAIL` depuis un add-in .NET. La solution qui marche : `Cancel=true` (supprime **tout** le menu Excel,
   même les items injectés) puis afficher **notre propre menu** WinForms/WPF, en différé via `QueueAsMacro`.
 
+## Démarrage configurable (ouverture de classeurs)
+
+L'add-in possède un point de **démarrage** (`AddIn.AutoOpen` → `StartupLoader.Run`) piloté par
+configuration ([StartupConfig.cs](StartupConfig.cs) / [StartupLoader.cs](StartupLoader.cs)) :
+
+- Au chargement, l'add-in lit **`startup.json`** placé **à côté du `.xll`**. Schéma actuel
+  (appelé à évoluer — critères, conditions…), avec chemins **relatifs** au dossier du `.xll` :
+  ```json
+  { "openWorkbooks": [ "TestAddin.xlsx" ] }
+  ```
+- Chaque classeur listé est ouvert **de façon asynchrone** : l'ouverture est différée via
+  `ExcelAsyncUtil.QueueAsMacro`, donc elle ne **bloque pas** `AutoOpen` (le journal montre
+  « AutoOpen fin » *avant* « classeur ouvert »).
+- **Fonctionne dans les deux modes de lancement** grâce aux chemins relatifs :
+  - **F5 (Visual Studio)** : `startup.json` et `TestAddin.xlsx` sont copiés dans le dossier de
+    sortie via `CopyToOutputDirectory` (csproj), à côté du `.xll` non packé.
+  - **`Launch-AddIn.ps1`** : le script copie ces deux fichiers à côté du `.xll` packé (`publish\`).
+- Classeur de test : [TestAddin.xlsx](TestAddin.xlsx) (contient `BlagueMenuExcel`, `BlagueMenuWinform`,
+  `BlagueMenuWpf` pour tester les 3 menus contextuels).
+
 ### Pattern asynchrone (important)
 Le modèle objet Excel est **mono-thread (STA)** : interdit d'y toucher depuis le thread de
 continuation après un `await`. Le pattern correct :
@@ -143,7 +165,25 @@ Excel demandera d'activer le complément (cocher la case).
 > Si Excel bloque le fichier (zone non sûre / OneDrive), clic droit sur le `.xll`
 > → *Propriétés* → cocher *Débloquer*.
 
+## Déboguer
+
+**Visual Studio** : ouvrir `ExcelDnaPoc.sln`, vérifier que le profil **« Excel »** est sélectionné,
+puis **F5** (le profil `launchSettings.json` est généré par `RunExcelDnaSetDebuggerOptions`).
+
+**Visual Studio Code** : config fournie dans `.vscode/` (nécessite l'extension **C# Dev Kit**) —
+- **« Excel : lancer + debug »** (F5) : build, lance Excel avec le `.xll` non packé et attache le
+  débogueur ; les points d'arrêt dans le C# sont actifs.
+- **« Excel : attacher »** : repli — attacher à une instance Excel déjà lancée (ex. via
+  `Launch-AddIn.ps1`), en choisissant le process `EXCEL.EXE`.
+
+Dans les deux IDE :
+- au **1er lancement**, Excel affiche le prompt « Activer le complément » (chargement par `/x`) → cliquer
+  *Activer* (ou ajouter le dossier de sortie aux **Emplacements approuvés** d'Excel) ;
+- **fermer Excel avant de recompiler** (le `.xll` chargé est verrouillé) — à l'arrêt du débogage,
+  l'IDE ferme Excel automatiquement.
+
 ## Développement : recharge rapide
 
 Après modification du code, relancez `dotnet build` puis rechargez l'add-in dans Excel
-(décocher / recocher dans la liste des compléments, ou redémarrer Excel).
+(décocher / recocher dans la liste des compléments, ou redémarrer Excel) — ou utilisez
+`Launch-AddIn.ps1` (chargement par COM `RegisterXLL`, sans prompt de sécurité).

@@ -11,8 +11,12 @@ x86/
 
 # ---- Visual Studio / Rider / VS Code ----
 .vs/
-.vscode/
 .idea/
+
+# VS Code : on versionne la config de debug du projet, on ignore le reste
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
 *.user
 *.suo
 *.userosscache

@@ -24,4 +24,16 @@
     <PackageReference Include="ExcelDna.AddIn" Version="1.9.0" />
   </ItemGroup>
 
+  <!-- Config de demarrage + classeur de test copies a cote du .xll dans la sortie,
+       pour que le demarrage (StartupLoader, chemins relatifs) fonctionne aussi en F5
+       sous Visual Studio (qui charge le .xll non packe du dossier de sortie). -->
+  <ItemGroup>
+    <None Update="startup.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="TestAddin.xlsx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

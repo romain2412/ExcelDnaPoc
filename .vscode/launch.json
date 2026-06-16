@@ -1,0 +1,33 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // Lance Excel avec le .xll (non packe -> symboles/PDB a cote) et attache le
+      // debogueur .NET. Les points d'arret dans le code C# sont alors actifs.
+      // Prerequis : extension "C# Dev Kit" (ou "C#") installee dans VS Code.
+      // NB : Excel affichera le prompt "Activer le complement" au 1er lancement.
+      "name": "Excel : lancer + debug",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "C:\\Program Files\\Microsoft Office\\root\\Office16\\EXCEL.EXE",
+      "args": [
+        "/x",
+        "${workspaceFolder}\\bin\\x64\\Debug\\net8.0-windows\\ExcelDnaPoc-AddIn64.xll"
+      ],
+      "cwd": "${workspaceFolder}\\bin\\x64\\Debug\\net8.0-windows",
+      "console": "internalConsole",
+      "stopAtEntry": false,
+      "justMyCode": true,
+      "requireExactSource": false
+    },
+    {
+      // Repli : attacher le debogueur a une instance d'Excel deja lancee
+      // (par ex. via Launch-AddIn.ps1). Choisir le process EXCEL.EXE dans la liste.
+      "name": "Excel : attacher",
+      "type": "coreclr",
+      "request": "attach",
+      "processId": "${command:pickProcess}"
+    }
+  ]
+}

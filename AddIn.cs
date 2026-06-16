@@ -15,6 +15,7 @@ public class AddIn : IExcelAddIn
     {
         Log.Info("=== AutoOpen debut ===");
         CellRightClickInterceptor.Hook();
+        StartupLoader.Run(); // ouvre les classeurs definis dans startup.json (async)
         Log.Info("=== AutoOpen fin ===");
     }
 

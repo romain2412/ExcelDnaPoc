@@ -43,12 +43,30 @@ Compile d'abord le projet :
 
 try { Unblock-File -Path $xll } catch { }
 
+# --- Configuration de demarrage ---
+# Le .xll packe est dans publish\ : on y copie startup.json (chemins RELATIFS) et le
+# classeur de test, A COTE du .xll. L'add-in (StartupConfig/StartupLoader) lit startup.json
+# au chargement et ouvre les classeurs listes (de maniere asynchrone).
+# NB : en F5 sous Visual Studio, ces fichiers sont deja copies dans la sortie par le csproj
+# (CopyToOutputDirectory) -> meme comportement sans ce script.
+$publishDir = Split-Path $xll -Parent
+foreach ($f in 'startup.json', 'TestAddin.xlsx') {
+    $src = Join-Path $root $f
+    if (Test-Path $src) {
+        Copy-Item $src $publishDir -Force
+    } else {
+        Write-Warning "$f introuvable a la racine du projet ($src)."
+    }
+}
+Write-Host "Config de demarrage copiee dans : $publishDir" -ForegroundColor Gray
+
 Write-Host "Chargement de l'add-in dans Excel (COM RegisterXLL) :" -ForegroundColor Cyan
 Write-Host "  $xll" -ForegroundColor Gray
 
 $excel = New-Object -ComObject Excel.Application
 $excel.Visible = $true
-[void]$excel.Workbooks.Add()
+# Pas de classeur vide ici : c'est le demarrage de l'add-in (startup.json) qui ouvre
+# TestAddin.xlsx. On evite ainsi un "Classeur1" superflu en plus.
 
 $ok = $excel.RegisterXLL($xll)
 if ($ok) {
