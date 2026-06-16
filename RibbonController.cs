@@ -24,9 +24,10 @@ public partial class RibbonController : ExcelRibbon
     // Reference au ruban (capturee au onLoad) pour appeler Invalidate.
     private IRibbonUI? _ribbon;
 
-    // Concepts autonomes, instancies une fois.
-    private readonly TaskPaneController _taskPane = new();
-    private readonly JokeApiService _joke = new();
+    // Services partages (memes instances que le menu contextuel et l'interception
+    // du clic droit) : etat et comportement communs quel que soit le declencheur.
+    private readonly TaskPaneController _taskPane = AddInServices.TaskPane;
+    private readonly JokeApiService _joke = AddInServices.Joke;
 
     public RibbonController()
     {
@@ -36,12 +37,24 @@ public partial class RibbonController : ExcelRibbon
     }
 
     // Callback onLoad du CustomUI : on garde la reference IRibbonUI.
-    public void OnRibbonLoad(IRibbonUI ribbon) => _ribbon = ribbon;
+    public void OnRibbonLoad(IRibbonUI ribbon)
+    {
+        _ribbon = ribbon;
+        Log.Info("OnRibbonLoad - ruban ACCEPTE et charge par Excel.");
+    }
 
     // Assemble le XML CustomUI a partir des fragments fournis par les fichiers partiels.
     // ATTENTION : c'est du XML. Dans un attribut delimite par des apostrophes, une
     // apostrophe litterale doit s'ecrire &apos; (et JAMAIS '' comme en VBA).
-    public override string GetCustomUI(string ribbonId) =>
+    public override string GetCustomUI(string ribbonId)
+    {
+        Log.Info($"GetCustomUI({ribbonId}) appele par Excel");
+        string xml = BuildRibbonXml();
+        Log.Info($"GetCustomUI -> {xml.Length} caracteres retournes");
+        return xml;
+    }
+
+    private static string BuildRibbonXml() =>
         $"""
         <customUI xmlns='http://schemas.microsoft.com/office/2009/07/customui' onLoad='OnRibbonLoad'>
           <ribbon>
@@ -55,6 +68,7 @@ public partial class RibbonController : ExcelRibbon
               </tab>
             </tabs>
           </ribbon>
+          {ContextMenuXml}
         </customUI>
         """;
 }

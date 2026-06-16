@@ -29,6 +29,10 @@ Le code est découpé pour qu'**un fichier = un concept/une fonctionnalité Exce
 | `RibbonController.Interactive.cs` | *partial* — groupe « Interactif » (contrôles à état) |
 | `RibbonController.TaskPane.cs` | *partial* — adaptateur ruban → `TaskPaneController` |
 | `RibbonController.AsyncApi.cs` | *partial* — adaptateur ruban → `JokeApiService` |
+| `RibbonController.ContextMenu.cs` | *partial* — **Solution 2** : menu contextuel CustomUI (`getVisible`) |
+| `CellRightClickInterceptor.cs` | **Solution 1** : interception `SheetBeforeRightClick` + popup |
+| `AddInServices.cs` | Services partagés (volet, service async) + déclencheur commun `ChuckTrigger` |
+| `ChuckCommands.cs` | Macro `[ExcelCommand]` appelée par le popup (Solution 1) |
 | `TaskPaneController.cs` | **Custom Task Pane** : cycle de vie du volet, hébergement WPF |
 | `JokeApiService.cs` | **Async + `QueueAsMacro` + annulation** (`CancellationToken`) |
 | `WpfPaneHost.cs` | Pont **WinForms ↔ WPF** (`ElementHost`, ComVisible) |
@@ -61,6 +65,31 @@ Le code est découpé pour qu'**un fichier = un concept/une fonctionnalité Exce
   utilisable** (saisie, navigation, etc.).
 - **Annuler** (`button`, `getEnabled`) — actif uniquement pendant une opération ; interrompt
   proprement l'attente en cours via un `CancellationToken` (la blague n'est alors pas écrite).
+
+**Menu contextuel (clic droit sur une cellule)** — 3 comportements selon le contenu de la cellule :
+
+| Contenu de la cellule | Au clic droit | Implémentation |
+|-----------------------|---------------|----------------|
+| `BlagueMenuExcel` | entrée **« Blague (async) »** **ajoutée** au menu Excel normal | CustomUI `getVisible` sur un `<button>` du `<contextMenu idMso='ContextMenuCell'>` ([RibbonController.ContextMenu.cs](RibbonController.ContextMenu.cs)) |
+| `BlagueMenuWinform` | menu **WinForms** ne contenant **que** « Blague (async) » | interception + `ContextMenuStrip.Show()` ([CellRightClickInterceptor.cs](CellRightClickInterceptor.cs)) |
+| `BlagueMenuWpf` | menu **WPF** ne contenant **que** « Blague (async) » | interception + `System.Windows.Controls.ContextMenu` (`IsOpen=true`, `Placement=MousePoint`) ([CellRightClickInterceptor.cs](CellRightClickInterceptor.cs)) |
+| autre | menu Excel habituel | — |
+
+Les trois déclenchent le **même** comportement async que le bouton du ruban (via `ChuckTrigger.Run`).
+Chaînes déclencheuses = constantes (`CtxTrigger`, `TriggerWinforms`, `TriggerWpf`) faciles à modifier.
+
+### Notes d'implémentation (pièges rencontrés)
+- **CustomUI** : `<contextMenus>` doit être **après** `<ribbon>` (ordre du schéma : `commands`, `ribbon`,
+  `backstage`, `contextMenus`). `getVisible` est OK sur un `<button>` de menu contextuel mais **invalide
+  sur un `<menuSeparator>`** → Excel rejette alors tout le CustomUI **en silence** (ni ruban ni erreur).
+- **Interception** (Winform/Wpf) : abonnement à `Application.SheetBeforeRightClick` **sans aucun interop
+  Office** (sous .NET 8, `<COMReference>` n'est pas supporté par `dotnet build`, et le package interop
+  échoue au runtime : `FileNotFoundException 'office'`). On passe par les **points de connexion COM**
+  (`IConnectionPoint*` du BCL) + un sink IDispatch portant le `DispId(1560)` de `SheetBeforeRightClick`.
+- **« Uniquement notre entrée »** : impossible via `CommandBars` (Excel moderne **injecte** des items —
+  barre de recherche, options de collage… — hors `CommandBars`), et `CommandBar.ShowPopup()` renvoie
+  `E_FAIL` depuis un add-in .NET. La solution qui marche : `Cancel=true` (supprime **tout** le menu Excel,
+  même les items injectés) puis afficher **notre propre menu** WinForms/WPF, en différé via `QueueAsMacro`.
 
 ### Pattern asynchrone (important)
 Le modèle objet Excel est **mono-thread (STA)** : interdit d'y toucher depuis le thread de

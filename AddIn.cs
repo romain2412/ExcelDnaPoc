@@ -13,12 +13,14 @@ public class AddIn : IExcelAddIn
 {
     public void AutoOpen()
     {
-        // Exemple de point d'initialisation au chargement de l'add-in.
-        // (Le ruban et le volet sont, eux, crees a la demande par Excel/ExcelDna.)
+        Log.Info("=== AutoOpen debut ===");
+        CellRightClickInterceptor.Hook();
+        Log.Info("=== AutoOpen fin ===");
     }
 
     public void AutoClose()
     {
-        // Exemple de point de nettoyage au dechargement de l'add-in.
+        // Desabonnement propre au dechargement de l'add-in.
+        CellRightClickInterceptor.Unhook();
     }
 }

@@ -21,16 +21,9 @@ public partial class RibbonController
         </group>
         """;
 
-    // Clic : s'execute sur le thread principal d'Excel. On capture la cellule active
-    // de la feuille affichee, on ouvre le volet (barre de progression), puis on delegue.
-    public void OnChuckNorrisClick(IRibbonControl control)
-    {
-        dynamic target = ((dynamic)ExcelDnaUtil.Application).ActiveCell;
-        target.Value2 = "Chargement de la blague...";
-
-        WpfPane pane = _taskPane.Show(); // ouvre le volet et renvoie son contenu WPF
-        _joke.Start(target, pane);       // lance l'operation async (fire-and-forget)
-    }
+    // Clic ruban OU entree du menu contextuel (Solution 2) : meme comportement,
+    // delegue au declencheur commun (capture cellule active, ouvre le volet, lance l'async).
+    public void OnChuckNorrisClick(IRibbonControl control) => ChuckTrigger.Run();
 
     public void OnCancelClick(IRibbonControl control) => _joke.Cancel();
 
