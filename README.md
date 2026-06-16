@@ -148,7 +148,7 @@ bons `[DispId]` — **sans aucun interop Office**.
 | `Change` | 1545 | une **cellule de cette feuille** est modifiée |
 | `Activate` | 304 | on **bascule sur cet onglet** |
 | `Deactivate` | 1530 | on **quitte cet onglet** |
-| `BeforeDoubleClick` | 1537 | **double-clic** sur une cellule — **annulable** (`ref bool Cancel`) |
+| `BeforeDoubleClick` | 1537 | **double-clic** sur une cellule → déclenche la **Blague async** (même `ChuckTrigger.Run` que les menus / le bouton ruban) ; `Cancel=true` empêche l'entrée en édition |
 | `Calculate` | 279 | la feuille est **recalculée** (formules réévaluées) |
 
 > **Workbook vs Worksheet** : les événements `Sheet*` (niveau Workbook) se déclenchent pour **toutes**

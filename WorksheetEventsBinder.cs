@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
+using ExcelDna.Integration;
 
 namespace ExcelDnaPoc;
 
@@ -109,7 +110,15 @@ public class WorksheetEventsSink : IWorksheetEvents
 
     public void BeforeDoubleClick(object Target, ref bool Cancel)
     {
-        try { Log.Info($"[{_sheet}] (ws) BeforeDoubleClick : {((dynamic)Target).Address} (Cancel={Cancel})"); }
+        try
+        {
+            Log.Info($"[{_sheet}] (ws) BeforeDoubleClick : {((dynamic)Target).Address} -> Blague async");
+
+            // Le double-clic declenche le MEME comportement que les menus contextuels /
+            // le bouton du ruban (appel API Chuck Norris, attente, ecriture a droite).
+            Cancel = true; // empeche l'entree en edition de la cellule double-cliquee
+            ExcelAsyncUtil.QueueAsMacro(ChuckTrigger.Run); // differe (hors evenement)
+        }
         catch (Exception ex) { Log.Error("ws BeforeDoubleClick", ex); }
     }
 
