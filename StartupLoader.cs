@@ -51,8 +51,11 @@ public static class StartupLoader
                 }
             }
 
-            app.Workbooks.Open(full);
+            dynamic opened = app.Workbooks.Open(full);
             Log.Info($"Startup: classeur ouvert -> {full}");
+
+            // On binde les evenements Excel de ce classeur sur des callbacks C#.
+            WorkbookEventsBinder.Bind(opened);
         }
         catch (Exception ex)
         {

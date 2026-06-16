@@ -23,5 +23,6 @@ public class AddIn : IExcelAddIn
     {
         // Desabonnement propre au dechargement de l'add-in.
         CellRightClickInterceptor.Unhook();
+        WorkbookEventsBinder.UnbindAll();
     }
 }

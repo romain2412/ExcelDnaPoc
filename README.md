@@ -24,6 +24,7 @@ Le code est découpé pour qu'**un fichier = un concept/une fonctionnalité Exce
 | `ExcelDnaPoc.csproj` | Projet .NET 8, référence `ExcelDna.AddIn`, génère le `.xll` |
 | `AddIn.cs` | **Cycle de vie** de l'add-in (`IExcelAddIn` : `AutoOpen`/`AutoClose`) |
 | `StartupConfig.cs` / `StartupLoader.cs` | **Démarrage configurable** : ouvre des classeurs au chargement selon `startup.json` |
+| `WorkbookEventsBinder.cs` | **Événements Excel → callbacks C#** sur les classeurs ouverts (niveau `WorkbookEvents`) |
 | `TestAddin.xlsx` | Classeur de test (`BlagueMenuExcel` / `BlagueMenuWinform` / `BlagueMenuWpf`) |
 | `RibbonController.cs` | **Ruban** — cœur : assemble le XML CustomUI, capture `IRibbonUI`, câble les délégations |
 | `RibbonController.Demonstration.cs` | *partial* — groupe « Demonstration » (commandes simples) |
@@ -112,6 +113,16 @@ configuration ([StartupConfig.cs](StartupConfig.cs) / [StartupLoader.cs](Startup
   - **`Launch-AddIn.ps1`** : le script copie ces deux fichiers à côté du `.xll` packé (`publish\`).
 - Classeur de test : [TestAddin.xlsx](TestAddin.xlsx) (contient `BlagueMenuExcel`, `BlagueMenuWinform`,
   `BlagueMenuWpf` pour tester les 3 menus contextuels).
+
+### Événements Excel → callbacks C# (sur les classeurs ouverts)
+
+Chaque classeur ouvert par le démarrage voit ses **événements Excel bindés sur des callbacks C#**
+([WorkbookEventsBinder.cs](WorkbookEventsBinder.cs)) : `SheetSelectionChange`, `SheetChange`,
+`Activate`, `Deactivate`, `BeforeClose`. Même technique que l'interception du clic droit (points de
+connexion COM + sink IDispatch, **sans interop Office**) mais au niveau `WorkbookEvents`
+(GUID `00024412-…`). Pour ajouter un événement : déclarer un `[DispId(...)]` de plus dans
+l'interface `IWorkbookEvents`. *(Sélectionner/éditer une cellule de `TestAddin.xlsx` est tracé dans
+le journal `%TEMP%\ExcelDnaPoc.log`.)*
 
 ### Pattern asynchrone (important)
 Le modèle objet Excel est **mono-thread (STA)** : interdit d'y toucher depuis le thread de
