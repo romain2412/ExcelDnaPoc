@@ -63,6 +63,7 @@ public partial class RibbonController : ExcelRibbon
                 {InteractiveXml}
                 {TaskPaneXml}
                 {AsyncApiXml}
+                {UdfXml}
               </tab>
             </tabs>
           </ribbon>

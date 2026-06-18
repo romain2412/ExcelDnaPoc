@@ -32,10 +32,12 @@ Le code est découpé pour qu'**un fichier = un concept/une fonctionnalité Exce
 | `RibbonController.Interactive.cs` | *partial* — groupe « Interactif » (contrôles à état) |
 | `RibbonController.TaskPane.cs` | *partial* — adaptateur ruban → `TaskPaneController` |
 | `RibbonController.AsyncApi.cs` | *partial* — adaptateur ruban → `ChuckTrigger` |
+| `RibbonController.Udf.cs` | *partial* — menu **« UDF Sync »** : insère une formule UDF dans la sélection |
 | `RibbonController.ContextMenu.cs` | *partial* — **Solution 2** : menu contextuel CustomUI (`getVisible`) |
 | `CellRightClickInterceptor.cs` | **Solution 1** : interception `SheetBeforeRightClick` + popup |
 | `AddInServices.cs` | Services partagés (volet, service async) + déclencheur commun `ChuckTrigger` |
 | `ChuckCommands.cs` | Macro `[ExcelCommand]` appelée par le popup (Solution 1) |
+| `Functions.cs` | **UDF** (`[ExcelFunction]`) appelables depuis une cellule — `=POC.ADDITION(...)` |
 | `TaskPaneController.cs` | **Custom Task Pane** : cycle de vie du volet, hébergement WPF |
 | `JokeJob.cs` | **Un traitement async indépendant** : `CancellationTokenSource` propre, **parallélisable** |
 | `JobRow.xaml` (+`.cs`) | Ligne d'UI d'un traitement : statut + **barre de progression** + **Annuler** |
@@ -99,6 +101,54 @@ Chaînes déclencheuses = constantes (`CtxTrigger`, `TriggerWinforms`, `TriggerW
   barre de recherche, options de collage… — hors `CommandBars`), et `CommandBar.ShowPopup()` renvoie
   `E_FAIL` depuis un add-in .NET. La solution qui marche : `Cancel=true` (supprime **tout** le menu Excel,
   même les items injectés) puis afficher **notre propre menu** WinForms/WPF, en différé via `QueueAsMacro`.
+
+## UDF — fonctions de feuille (`=POC.…`)
+
+Le cœur d'ExcelDna : des **fonctions personnalisées** appelables depuis une cellule
+([Functions.cs](Functions.cs)). Méthodes marquées `[ExcelFunction]` (avec `Name`, `Description`,
+`Category` et `[ExcelArgument]` qui alimentent l'**Assistant de fonction** `fx`) :
+
+| Fonction | Exemple | Résultat |
+|----------|---------|----------|
+| `POC.ADDITION(a; b)` | `=POC.ADDITION(2;3)` | `5` |
+| `POC.BONJOUR(nom)` | `=POC.BONJOUR("Romain")` | `Bonjour Romain !` |
+| `POC.SOMMEPERSO(plage)` | `=POC.SOMMEPERSO(H1:H4)` | `35` *(somme des nombres)* |
+| `POC.CONCAT(plage; sep)` | `=POC.CONCAT(H1:H4;" \| ")` | `10 \| 20 \| texte \| 5` |
+| `POC.DOUBLER(plage)` | `=POC.DOUBLER(H1:H4)` | tableau `20;40;texte;10` *(spill / matricielle)* |
+| `POC.MOYENNE(plage)` | `=POC.MOYENNE(L1:L4)` | `2,5` *(`double[,]` — texte → `#VALEUR!`)* |
+| `POC.COMPTENB(plage)` | `=POC.COMPTENB(H1:H4)` | `3` *(`object[]` 1D : ligne/colonne)* |
+| `POC.INFOPLAGE(plage)` | `=POC.INFOPLAGE(H1:H4)` | `3 nombre(s), 1 texte(s), 0 vide(s)…` |
+| `POC.PRODUITSCALAIRE(p1; p2)` | `=POC.PRODUITSCALAIRE(L1:L4;L1:L4)` | `30` *(2 plages ; tailles ≠ → `#VALEUR!`)* |
+
+**Types de paramètres « plage » et conversions** :
+- **`object[,]`** (2D, n'importe quelle plage) : reçoit **tout** — nombre → `double`, texte → `string`,
+  vide → `ExcelEmpty`, erreur → `ExcelError`, optionnel omis → `ExcelMissing`. On trie au code.
+- **`double[,]`** : ExcelDna **convertit en nombres** — vide → `0`, nombre → sa valeur, **texte →
+  échec → la fonction renvoie `#VALEUR!`** (la plage doit être numérique/vide).
+- **`object[]`** : plage **1D** (une seule ligne ou colonne).
+- **Plusieurs plages** : autant de paramètres « plage » que voulu (cf. `POC.PRODUITSCALAIRE`).
+- **Renvoyer un `object[,]`** → un tableau qui « spill » (dynamic arrays) ou formule matricielle
+  (`Ctrl+Maj+Entrée`). **Renvoyer une erreur** : `return ExcelError.ExcelErrorValue;` → `#VALEUR!`.
+
+> `ExcelAddInExplicitExports=true` → seules les méthodes marquées `[ExcelFunction]`/`[ExcelCommand]`
+> sont exportées. (Pistes ExcelDna non encore explorées : UDF **asynchrones**, **RTD** temps réel,
+> IntelliSense, API C bas niveau…)
+
+**Menu ruban « UDF Sync »** ([RibbonController.Udf.cs](RibbonController.Udf.cs)) : un bouton à menu
+déroulant ; chaque entrée **insère sa formule dans la/les cellule(s) sélectionnée(s)**. La formule est
+portée par l'attribut `tag` du `<button>` → **un seul callback** `OnInsertFormula` la lit et l'écrit
+(`Selection.Formula`) → pour ajouter une formule au menu, il suffit d'ajouter un `<button tag='=…'/>`.
+Les exemples sont **auto-suffisants** : les UDF à plage utilisent des **constantes matricielles**
+(`{10;20;30}`) → ils donnent un résultat **depuis n'importe quelle cellule** (pas de dépendance aux
+cellules voisines). *(`.Formula` = syntaxe US : `,` sépare les arguments, `;` les lignes d'une
+constante matricielle.)*
+
+**Exemples prêts à l'emploi** : le classeur de test [TestAddin.xlsx](TestAddin.xlsx) contient une
+feuille **« UDF »** avec des données d'exemple et **toutes les formules** en action :
+- **plages 1D** (une colonne : `A2:A5`, `B2:B5`) ;
+- **plages 2D** (`A2:B5` = 4 lignes × 2 colonnes) : `SOMMEPERSO`→45, `INFOPLAGE`→« 7 nombres, 1 texte »,
+  `CONCAT` (ordre **ligne par ligne** : `10 | 1 | 20 | 2 | …`), et `DOUBLER(A2:B5)` qui renvoie un
+  **tableau 2D 4×2** (en G2:H5). → un `object[,]` reçoit bien les **deux dimensions**.
 
 ## Démarrage configurable (ouverture de classeurs)
 
