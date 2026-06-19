@@ -1,4 +1,8 @@
+using System;
 using System.Collections.Generic;
+using System.Net.Http;
+using System.Text.Json;
+using System.Threading;
 using ExcelDna.Integration;
 
 namespace ExcelDnaPoc;
@@ -12,6 +16,34 @@ namespace ExcelDnaPoc;
 // Category + [ExcelArgument] alimentent l'Assistant de fonction (fx).
 public static class Functions
 {
+    private const string JokeUrl = "https://api.chucknorris.io/jokes/random";
+    private static readonly HttpClient _http = new();
+
+    // ----- UDF qui fait un I/O reseau de maniere SYNCHRONE (le contre-exemple) -----
+    // L'appel API se fait sur le thread de calcul d'Excel : tant qu'il dure, Excel
+    // est FIGE (sablier, ruban inerte, saisie impossible). Le Thread.Sleep prolonge
+    // volontairement le gel pour le SENTIR. Le pendant NON bloquant est
+    // POC.CHUCKNORRISASYNC (cf. FunctionsAsync.cs) -> a comparer pour saisir l'interet
+    // de l'async sur un I/O.
+    [ExcelFunction(
+        Name = "POC.CHUCKNORRIS",
+        Description = "Appelle l'API Chuck Norris de maniere SYNCHRONE : BLOQUE Excel jusqu'a la reponse.",
+        Category = "POC ExcelDna")]
+    public static string ChuckNorris()
+    {
+        try
+        {
+            string json = _http.GetStringAsync(JokeUrl).GetAwaiter().GetResult();
+            Thread.Sleep(15_000);
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.GetProperty("value").GetString() ?? "(reponse vide)";
+        }
+        catch (Exception ex)
+        {
+            return "Erreur API : " + ex.Message;
+        }
+    }
+
     [ExcelFunction(
         Name = "POC.ADDITION",
         Description = "Additionne deux nombres.",

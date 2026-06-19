@@ -36,6 +36,13 @@ public partial class RibbonController
                     onAction='OnInsertFormula' tag='=POC.DOUBLER({1;2;3})'/>
             <button id='udfScalaire' label='POC.PRODUITSCALAIRE({1;2;3};{4;5;6})'
                     onAction='OnInsertFormula' tag='=POC.PRODUITSCALAIRE({1;2;3},{4;5;6})'/>
+            <button id='udfChuckSync' label='POC.CHUCKNORRIS() (bloque Excel)'
+                    onAction='OnInsertFormula' tag='=POC.CHUCKNORRIS()'/>
+            <menuSeparator id='udfSep2' title='Async (non bloquant)'/>
+            <button id='udfChuck' label='POC.CHUCKNORRISASYNC()'
+                    onAction='OnInsertFormula' tag='=POC.CHUCKNORRISASYNC()'/>
+            <button id='udfAttendre' label='POC.ATTENDRE(5)'
+                    onAction='OnInsertFormula' tag='=POC.ATTENDRE(5)'/>
           </menu>
         </group>
         """;
