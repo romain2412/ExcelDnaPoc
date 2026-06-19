@@ -18,6 +18,8 @@ public class AddIn : IExcelAddIn
         // Active l'IntelliSense en ligne pour nos UDF (liste + infobulle d'arguments).
         // Uninstall() OBLIGATOIRE dans AutoClose, sinon Excel crashe au dechargement.
         IntelliSenseServer.Install();
+        // Enregistre le serveur COM (ProgId ExcelDnaPoc.Chuck) -> CreateObject() en VBA.
+        ExcelDna.ComInterop.ComServer.DllRegisterServer();
         CellRightClickInterceptor.Hook();
         StartupLoader.Run(); // ouvre les classeurs definis dans startup.json (async)
         Log.Info("=== AutoOpen fin ===");
@@ -27,6 +29,7 @@ public class AddIn : IExcelAddIn
     {
         // Desabonnement propre au dechargement de l'add-in.
         IntelliSenseServer.Uninstall(); // pendant obligatoire de Install() (cf. AutoOpen)
+        ExcelDna.ComInterop.ComServer.DllUnregisterServer(); // pendant de DllRegisterServer()
         CellRightClickInterceptor.Unhook();
         WorkbookEventsBinder.UnbindAll();
         WorksheetEventsBinder.UnbindAll();

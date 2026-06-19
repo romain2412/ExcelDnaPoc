@@ -2,7 +2,9 @@
 
 Add-in Excel écrit en **C# / .NET 8** avec [ExcelDna](https://excel-dna.net/) 1.9.
 Il ajoute un onglet **« POC ExcelDna »** dans le ruban Excel, avec trois boutons.
-Aucune ligne de VBA — toute la logique est en C#.
+Toute la logique est en C# — à **une exception assumée près** : une petite macro VBA
+([ChuckMacro.bas](ChuckMacro.bas)) qui sert justement à démontrer comment **consommer un
+objet COM C# depuis VBA** (cf. section dédiée plus bas).
 
 ## Prérequis
 
@@ -43,6 +45,11 @@ Le code est découpé pour qu'**un fichier = un concept/une fonctionnalité Exce
 | `JobRow.xaml` (+`.cs`) | Ligne d'UI d'un traitement : statut + **barre de progression** + **Annuler** |
 | `WpfPaneHost.cs` | Pont **WinForms ↔ WPF** (`ElementHost`, ComVisible) |
 | `WpfPane.xaml` / `WpfPane.xaml.cs` | **Contenu WPF** du volet (UI + interactions Excel) |
+| `ChuckCom.cs` | **Objet COM** (`[ComVisible]` + `ProgId`) consommé depuis VBA — async **fire-and-forget** |
+| `ChuckMacro.bas` | **Source** de la macro VBA (texte, diffable, versionnée) |
+| `Generate-Xlam.ps1` | Régénère `ChuckMacro.xlam` depuis le `.bas` (Excel caché + injection VBA) |
+| `ChuckMacro.xlam` | **Complément VBA** *généré* (non versionné) — chargé au démarrage (`startup.json`) |
+| `RibbonController.Vba.cs` | *partial* — bouton « Blague COM (VBA) » → `Application.Run` la macro |
 
 ## Contrôles de l'onglet
 
@@ -245,6 +252,50 @@ Fichiers : [WpfPane.xaml](WpfPane.xaml) + [WpfPane.xaml.cs](WpfPane.xaml.cs) (co
 > Astuce : le `editBox`/`comboBox` valident la saisie avec **Entrée**. Les `checkBox`/`toggleButton`
 > lisent l'état de la cellule **active au chargement du ruban** ; sélectionne une cellule puis
 > rouvre l'onglet (ou appelle `Invalidate`) pour resynchroniser l'état affiché.
+
+## Objet COM (C#) consommé depuis VBA — fire-and-forget
+
+Démontre l'aller-retour complet **ruban (C#) → macro VBA → objet COM (C#)**, où le travail
+asynchrone **rend la main à Excel** sans aucun `DoEvents` ni événement.
+
+- [ChuckCom.cs](ChuckCom.cs) : classe `[ComVisible(true)]` + `[ProgId("ExcelDnaPoc.Chuck")]`
+  exposant l'interface IDispatch `IChuckCom`. ExcelDna en fait un **serveur COM** :
+  `<ExcelAddInComServer>true</ExcelAddInComServer>` (csproj → `ComServer="true"` dans le `.dna`)
+  + `ExcelDna.ComInterop.ComServer.DllRegisterServer()` dans `AutoOpen` → la classe devient
+  instanciable par `CreateObject("ExcelDnaPoc.Chuck")` (et `DllUnregisterServer()` dans `AutoClose`).
+- **Fire-and-forget** : `LancerBlague()` démarre l'appel API async **puis** un `Task.Delay(15 s)`
+  async, et **rend la main immédiatement** → la macro VBA se termine, **Excel reste réactif**
+  pendant tout l'IO. L'objet écrit la blague (cellule à droite de l'active) quand il a fini,
+  via `QueueAsMacro` (thread principal). Aucun thread n'est tenu pendant l'attente.
+- [ChuckMacro.bas](ChuckMacro.bas) : **source** (versionnée) de la macro `LancerBlagueAsync`
+  = `CreateObject(...)` + appel.
+- `ChuckMacro.xlam` : **complément VBA généré** depuis le `.bas` (artefact, non versionné — `.gitignore`).
+  Il est **ouvert automatiquement au démarrage** (listé dans [startup.json](startup.json)) → ses
+  macros sont disponibles globalement pour `Application.Run`, **sans aucune manipulation**.
+- Bouton ruban **« Blague COM (VBA) »** ([RibbonController.Vba.cs](RibbonController.Vba.cs)) →
+  `Application.Run("LancerBlagueAsync")`.
+
+**Utilisation** : sélectionner une cellule, cliquer **« Blague COM (VBA) »** dans le groupe
+**« VBA + COM »**. Excel reste utilisable ; la blague apparaît **~16 s** plus tard dans la cellule
+à droite (l'IO async ne tient aucun thread).
+
+### Génération du `.xlam` (automatique)
+
+Le `.xlam` est **régénéré depuis `ChuckMacro.bas` à chaque build et à chaque lancement** par
+[Generate-Xlam.ps1](Generate-Xlam.ps1) (Excel caché → `VBProject.VBComponents.Import` → `SaveAs`
+format 55 `.xlam`, via `%TEMP%` puis `Copy-Item` car le SaveAs direct vers OneDrive échoue) :
+
+- **Build VS / VS Code / `dotnet build`** : cible MSBuild `GenerateChuckXlam` (`AfterTargets="Build"`),
+  puis copie à côté du `.xll` (sortie non packée, pour F5).
+- **`Launch-AddIn.ps1`** : appelle le même script, puis copie vers `publish\` (à côté du `.xll` packé).
+
+> **Prérequis** : Excel installé **et** « Accès approuvé au modèle objet du projet VBA »
+> (Fichier → Options → Centre de gestion de la confidentialité → Paramètres des macros). Si absent
+> (ex. build CI sans Excel), la génération est **ignorée avec un avertissement** — le build ne casse pas
+> (`ContinueOnError`), mais le bouton VBA ne fonctionnera pas tant que le `.xlam` n'est pas généré.
+
+> **Test express** (sans le `.xlam`) : fenêtre **Exécution** (`Ctrl`+`G`) du VBE →
+> `CreateObject("ExcelDnaPoc.Chuck").LancerBlague` puis `Entrée`.
 
 ## Compiler
 

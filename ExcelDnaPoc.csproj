@@ -14,6 +14,11 @@
     <ExcelAddInExplicitExports>true</ExcelAddInExplicitExports>
     <RunExcelDnaPack>true</RunExcelDnaPack>
 
+    <!-- Expose les classes [ComVisible]+[ProgId] (ex. ChuckCom) comme serveur COM :
+         ajoute ComServer="true" a l'ExternalLibrary du .dna genere. Couple a
+         ComServer.DllRegisterServer() dans AutoOpen -> CreateObject() marche en VBA. -->
+    <ExcelAddInComServer>true</ExcelAddInComServer>
+
     <!-- Genere/maj automatiquement Properties\launchSettings.json (profil "Excel")
          a chaque build : F5 dans Visual Studio lance EXCEL.EXE avec le .xll charge.
          ExcelDna detecte le bon chemin d'Excel et la bonne version (32/64 bits). -->
@@ -38,5 +43,17 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+
+  <!-- ChuckMacro.xlam est un ARTEFACT DERIVE (non versionne) regenere depuis
+       ChuckMacro.bas a CHAQUE build, puis copie a cote du .xll (sortie F5/non packe).
+       Necessite Excel + AccessVBOM ; ContinueOnError -> un build sans Excel (CI) ne
+       casse pas. Launch-AddIn.ps1 lance le meme script pour le .xll packe (publish\). -->
+  <Target Name="GenerateChuckXlam" AfterTargets="Build">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\Generate-Xlam.ps1&quot;"
+          ContinueOnError="true" />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\ChuckMacro.xlam"
+          DestinationFolder="$(OutDir)"
+          Condition="Exists('$(MSBuildProjectDirectory)\ChuckMacro.xlam')" />
+  </Target>
 
 </Project>

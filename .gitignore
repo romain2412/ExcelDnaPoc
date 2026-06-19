@@ -32,5 +32,8 @@ project.lock.json
 Thumbs.db
 .DS_Store
 
+# Complement VBA genere depuis ChuckMacro.bas a chaque build (artefact derive)
+ChuckMacro.xlam
+
 # Copies de conflit OneDrive (ex. "TestAddin (4).xlsx")
 * (*).xlsx

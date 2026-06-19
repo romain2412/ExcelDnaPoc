@@ -65,6 +65,7 @@ public partial class RibbonController : ExcelRibbon
                 {AsyncApiXml}
                 {UdfXml}
                 {RtdXml}
+                {VbaComXml}
               </tab>
             </tabs>
           </ribbon>

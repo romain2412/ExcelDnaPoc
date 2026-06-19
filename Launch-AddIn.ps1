@@ -43,6 +43,10 @@ Compile d'abord le projet :
 
 try { Unblock-File -Path $xll } catch { }
 
+# Regenere le complement VBA (.xlam) depuis ChuckMacro.bas avant de le copier a cote
+# du .xll packe (meme script que la cible MSBuild du build).
+& (Join-Path $root 'Generate-Xlam.ps1')
+
 # --- Configuration de demarrage ---
 # Le .xll packe est dans publish\ : on y copie startup.json (chemins RELATIFS) et le
 # classeur de test, A COTE du .xll. L'add-in (StartupConfig/StartupLoader) lit startup.json
@@ -50,7 +54,7 @@ try { Unblock-File -Path $xll } catch { }
 # NB : en F5 sous Visual Studio, ces fichiers sont deja copies dans la sortie par le csproj
 # (CopyToOutputDirectory) -> meme comportement sans ce script.
 $publishDir = Split-Path $xll -Parent
-foreach ($f in 'startup.json', 'TestAddin.xlsx') {
+foreach ($f in 'startup.json', 'TestAddin.xlsx', 'ChuckMacro.xlam') {
     $src = Join-Path $root $f
     if (Test-Path $src) {
         Copy-Item $src $publishDir -Force
