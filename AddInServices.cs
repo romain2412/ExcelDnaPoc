@@ -8,6 +8,10 @@ namespace ExcelDnaPoc;
 public static class AddInServices
 {
     public static readonly TaskPaneController TaskPane = new();
+
+    // Gestionnaire des volets "spawn dynamique" (N volets independants, cf.
+    // MultiPaneManager) : distinct du volet WPF unique ci-dessus.
+    public static readonly MultiPaneManager MultiPane = new();
 }
 
 // Declencheur commun du comportement "Blague async".
