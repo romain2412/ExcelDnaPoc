@@ -263,10 +263,13 @@ asynchrone **rend la main à Excel** sans aucun `DoEvents` ni événement.
   `<ExcelAddInComServer>true</ExcelAddInComServer>` (csproj → `ComServer="true"` dans le `.dna`)
   + `ExcelDna.ComInterop.ComServer.DllRegisterServer()` dans `AutoOpen` → la classe devient
   instanciable par `CreateObject("ExcelDnaPoc.Chuck")` (et `DllUnregisterServer()` dans `AutoClose`).
-- **Fire-and-forget** : `LancerBlague()` démarre l'appel API async **puis** un `Task.Delay(15 s)`
-  async, et **rend la main immédiatement** → la macro VBA se termine, **Excel reste réactif**
-  pendant tout l'IO. L'objet écrit la blague (cellule à droite de l'active) quand il a fini,
-  via `QueueAsMacro` (thread principal). Aucun thread n'est tenu pendant l'attente.
+- **Fire-and-forget + volet** : `LancerBlague()` **délègue au déclencheur commun `ChuckTrigger`**
+  (le même que le bouton « Blague (async) », les menus contextuels et le double-clic) → il **ouvre
+  le volet WPF** et crée un `JokeJob` avec **sa ligne (barre de progression + bouton Annuler)**, puis
+  lance l'async (API + `Task.Delay(15 s)`) en fire-and-forget. La méthode COM **rend la main
+  immédiatement** → la macro VBA se termine, **Excel reste réactif**, et le traitement est
+  **suivable / annulable** depuis le volet. La blague s'écrit (cellule à droite) à la fin, via
+  `QueueAsMacro`. Aucune logique async dupliquée : tout vit dans `ChuckTrigger`/`JokeJob`/`WpfPane`.
 - [ChuckMacro.bas](ChuckMacro.bas) : **source** (versionnée) de la macro `LancerBlagueAsync`
   = `CreateObject(...)` + appel.
 - `ChuckMacro.xlam` : **complément VBA généré** depuis le `.bas` (artefact, non versionné — `.gitignore`).

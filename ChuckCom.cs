@@ -1,9 +1,4 @@
-using System;
-using System.Net.Http;
 using System.Runtime.InteropServices;
-using System.Text.Json;
-using System.Threading.Tasks;
-using ExcelDna.Integration;
 
 namespace ExcelDnaPoc;
 
@@ -20,10 +15,13 @@ namespace ExcelDnaPoc;
 // late-binding (Dim chuck As Object). [ClassInterface(None)] + l'interface = pattern
 // recommande (vs AutoDual).
 //
-// FIRE-AND-FORGET : LancerBlague() demarre le travail async et REND LA MAIN tout de
-// suite (la methode COM retourne immediatement). VBA n'attend pas -> Excel reste
-// reactif pendant TOUT l'IO. L'objet finit le travail en arriere-plan (vrai async,
-// aucun thread tenu) et ecrit la blague lui-meme via QueueAsMacro, comme JokeJob.
+// LancerBlague() DELEGUE au declencheur commun ChuckTrigger (le meme que le bouton
+// ruban "Blague (async)", les menus contextuels et le double-clic) : il ouvre le
+// VOLET WPF, cree un JokeJob (sa propre ligne avec BARRE DE PROGRESSION + bouton
+// ANNULER) et lance l'async (API + attente 15s) en FIRE-AND-FORGET. La methode COM
+// rend donc la main aussitot -> la macro VBA se termine, Excel reste reactif, et le
+// traitement est suivable/annulable depuis le volet. (Pas de logique async dupliquee
+// ici : tout vit deja dans ChuckTrigger/JokeJob/WpfPane.)
 [ComVisible(true)]
 [InterfaceType(ComInterfaceType.InterfaceIsIDispatch)]
 public interface IChuckCom
@@ -37,45 +35,5 @@ public interface IChuckCom
 [ClassInterface(ClassInterfaceType.None)]
 public class ChuckCom : IChuckCom
 {
-    private const string JokeUrl = "https://api.chucknorris.io/jokes/random";
-    private static readonly HttpClient _http = new();
-
-    public void LancerBlague()
-    {
-        // Sur le thread appelant (COM/VBA = thread principal d'Excel) : on capture la
-        // cible MAINTENANT = cellule a droite de la cellule active.
-        dynamic app = ExcelDnaUtil.Application;
-        dynamic active = app.ActiveCell;
-        dynamic target = active.Worksheet.Cells[(int)active.Row, (int)active.Column + 1];
-
-        target.Value2 = "Chargement de la blague (Excel reste utilisable)...";
-        app.StatusBar = "Chuck (COM) : appel API + attente 15s en arriere-plan...";
-
-        _ = RunAsync(target); // FIRE-AND-FORGET : on ne await pas -> retour immediat
-    }
-
-    private static async Task RunAsync(dynamic target)
-    {
-        try
-        {
-            string json = await _http.GetStringAsync(JokeUrl);   // async : aucun thread bloque
-            using var doc = JsonDocument.Parse(json);
-            string joke = doc.RootElement.GetProperty("value").GetString() ?? "(reponse vide)";
-
-            await Task.Delay(15_000);                            // attente async (timer, pas Thread.Sleep)
-
-            // Ecriture de la cellule + reset du statut sur le thread d'Excel.
-            ExcelAsyncUtil.QueueAsMacro(() =>
-            {
-                target.Value2 = joke;
-                ((dynamic)ExcelDnaUtil.Application).StatusBar = false; // restaure le statut par defaut
-            });
-        }
-        catch (Exception ex)
-        {
-            Log.Error("ChuckCom.RunAsync", ex);
-            ExcelAsyncUtil.QueueAsMacro(() =>
-                ((dynamic)ExcelDnaUtil.Application).StatusBar = "Chuck (COM) : erreur - " + ex.Message);
-        }
-    }
+    public void LancerBlague() => ChuckTrigger.Fire();
 }
