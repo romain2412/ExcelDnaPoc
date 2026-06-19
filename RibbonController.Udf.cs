@@ -43,6 +43,11 @@ public partial class RibbonController
                     onAction='OnInsertFormula' tag='=POC.CHUCKNORRISASYNC()'/>
             <button id='udfAttendre' label='POC.ATTENDRE(5)'
                     onAction='OnInsertFormula' tag='=POC.ATTENDRE(5)'/>
+            <menuSeparator id='udfSep3' title='API C (XlCall / ExcelReference)'/>
+            <button id='udfOuSuisJe' label='POC.OUSUISJE()'
+                    onAction='OnInsertFormula' tag='=POC.OUSUISJE()'/>
+            <button id='udfVoisine' label='POC.VALEURVOISINE()'
+                    onAction='OnInsertFormula' tag='=POC.VALEURVOISINE()'/>
           </menu>
         </group>
         """;
