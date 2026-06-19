@@ -22,6 +22,9 @@
 
   <ItemGroup>
     <PackageReference Include="ExcelDna.AddIn" Version="1.9.0" />
+    <!-- IntelliSense en ligne (liste deroulante + infobulle d'arguments) pour les UDF :
+         reutilise les metadonnees [ExcelFunction]/[ExcelArgument] deja declarees. -->
+    <PackageReference Include="ExcelDna.IntelliSense" Version="1.9.0" />
   </ItemGroup>
 
   <!-- Config de demarrage + classeur de test copies a cote du .xll dans la sortie,
